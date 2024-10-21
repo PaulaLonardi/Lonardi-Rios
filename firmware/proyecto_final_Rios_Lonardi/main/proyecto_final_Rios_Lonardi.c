@@ -129,8 +129,10 @@ void FuncTimerA(void* param){
 
 /*==================[external functions definition]==========================*/
 void app_main(void){
-	gpioConf_t pin_relay = {GPIO_01, GPIO_OUPUT};
-
+    
+	//gpioConf_t pin_relay = {GPIO_1, GPIO_OUPUT};
+    GPIOInit(GPIO_1,GPIO_OUTPUT);
+    
 	analog_input_config_t analog = {
 		.input = CH1, //le paso el canal
 		.mode = ADC_SINGLE,//el modo en el que va a operar
@@ -164,6 +166,3 @@ void app_main(void){
 /*==================[end of file]============================================*/
 
 
-}
-
-/*==================[end of file]============================================*/

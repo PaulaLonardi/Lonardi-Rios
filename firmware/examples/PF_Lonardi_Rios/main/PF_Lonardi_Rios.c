@@ -1,42 +1,50 @@
-/*! @mainpage Template
+/*! @mainpage ejemplo Bluetooth LED-RGB
  *
  * @section genDesc General Description
  *
- * This section describes how the program works.
- *
- * <a href="https://drive.google.com/...">Operation Example</a>
- *
- * @section hardConn Hardware Connection
- *
- * |    Peripheral  |   ESP32   	|
- * |:--------------:|:--------------|
- * | 	PIN_X	 	| 	GPIO_X		|
- *
+ * Este proyecto ejemplifica el uso del módulo de comunicación Bluetooth Low Energy (BLE) 
+ * junto con el manejo de tiras de LEDs RGB. 
+ * Permite manejar la tonalidad e intensidad del LED RGB incluído en la placa ESP-EDU, 
+ * mediante una aplicación móvil.
  *
  * @section changelog Changelog
  *
  * |   Date	    | Description                                    |
  * |:----------:|:-----------------------------------------------|
- * | 12/09/2023 | Document creation		                         |
+ * | 02/04/2024 | Document creation		                         |
  *
- * @authors Lonardi, Paula (paula.lonardi@ingenieria.uner.edu.ar)
- * Rios, Tomas (tomas.rios@ingenieria.uner.edu.ar)
+ * @author Albano Peñalva (albano.penalva@uner.edu.ar)
+ *
  */
 
 /*==================[inclusions]=============================================*/
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+
 #include "timer_mcu.h"
 #include "analog_io_mcu.h"
+
+#include "led.h"
+#include "neopixel_stripe.h"
+#include "ble_mcu.h"
+
 #include "gpio_mcu.h"
+
 /*==================[macros and definitions]=================================*/
-#define umbral 500
+//#define umbral 500
 #define PERIODO_SENSADO_US 15000
-uint16_t global_contador=0;
+#define UMBRAL_TEMPORAL 100000
+#define TIEMPO_CEBADO 100000
+uint16_t global_contador = 0;
 uint16_t senial_medida;
-uint16_t estado="esperando";
+uint16_t umbral = 2400;
+//uint16_t estado = "esperando";
+enum{esperando, tiempo,cebar};
+bool apertura = false;
 /*==================[internal data definition]===============================*/
 TaskHandle_t SensarTask_task_handle = NULL;
 TaskHandle_t ValveControlTask_task_handle = NULL;
@@ -63,31 +71,31 @@ static void SensarTask(void *pvParameter){
 }
 
 static void ProcesarTask(void *pvParameter){
-
+    uint8_t estado = esperando;
     while(true){
     	ulTaskNotifyTake(pdTRUE, portMAX_DELAY); 
         switch(estado){
-            case "esperando":
-            if(senial_medida > umbral){
-                estado = "tiempo";
+            case esperando:
+                if(senial_medida > umbral){
+                estado = tiempo;
             }
             break;
 
-            case "tiempo":
+            case tiempo:
             vTaskDelay(UMBRAL_TEMPORAL/ portTICK_PERIOD_MS);
             if (senial_medida > umbral){
-                estado= "cebar";
+                estado = cebar;
             }
             else{
-                estado="esperando";
+                estado = esperando;
             }
             break;
 
-            case  "cebar":
-            apertura=true;
-            vTaskDelay(TIEMPO_DE_CEBADO/ portTICK_PERIOD_MS);
-            apertura=false;
-            estado="esperando";
+            case cebar:
+            apertura = true;
+            vTaskDelay(TIEMPO_CEBADO/ portTICK_PERIOD_MS);
+            apertura = false;
+            estado = esperando;
 
         }
     }
@@ -99,19 +107,19 @@ static void ValveControlTask(void *pvParameter){
         if(apertura)
         {   global_contador = global_contador+1;
 
-            if(global_contador>=100){
-                GPIOOff;
-                global_contador=0;
+            if(global_contador >= 100){
+                GPIOOff(GPIO_1);
+                global_contador = 0;
             }
 
             else{
-                if(senial_medida>umbral){
-                    OpenValve();
+                if(senial_medida > umbral){
+                GPIOOn(GPIO_1);
                 }
 
                 else{
-                    CloseValve();
-                    global_contador=0;
+                    GPIOOff(GPIO_1);
+                    global_contador = 0;
                 }
             }
 
@@ -126,11 +134,13 @@ void FuncTimerA(void* param){
 //void FuncTimerB(void* param){
 //    vTaskNotifyGiveFromISR(ValveControlTask_task_handle, pdFALSE); 
 //}
+
 /*==================[external functions definition]==========================*/
 void app_main(void){
-	
-	gpioConf_t pin_relay = {GPIO_01, GPIO_OUTPUT};
-
+    
+	//gpioConf_t pin_relay = {GPIO_1, GPIO_OUPUT};
+    GPIOInit(GPIO_1,GPIO_OUTPUT);
+    
 	analog_input_config_t analog = {
 		.input = CH1, //le paso el canal
 		.mode = ADC_SINGLE,//el modo en el que va a operar
@@ -144,21 +154,23 @@ void app_main(void){
 
 
 	/* Inicialización de timers */
-    timer_config_t FuncTimerA = {
+    timer_config_t timer_sensar = {
         .timer = TIMER_A,
         .period = PERIODO_SENSADO_US,
         .func_p = FuncTimerA,
         .param_p = NULL
     };
 
-    TimerInit(&FuncTimerA);
+    TimerInit(&timer_sensar);
 
 
 	xTaskCreate(&ValveControlTask, "control de valvula",2048, NULL,5,&ValveControlTask_task_handle);
 	xTaskCreate(&SensarTask, "tarea de sensado",2048, NULL,5,&SensarTask_task_handle);
 	xTaskCreate(&ProcesarTask, "procesamiento de la info",2048, NULL,5,&ProcesarTask_task_handle);
 
-	TimerStart(FuncTimerA.timer);
+	TimerStart(timer_sensar.timer);
 	
 }
 /*==================[end of file]============================================*/
+
+

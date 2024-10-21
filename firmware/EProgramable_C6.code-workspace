@@ -32,6 +32,12 @@
         },
         {
             "path": "examples/ej_mfrc522"
+        },
+        {
+            "path": "proyecto_final_Rios_Lonardi"
+        },
+        {
+            "path": "examples/PF_Lonardi_Rios"
         }
     ],
     "settings": {
