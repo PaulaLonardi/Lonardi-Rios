@@ -33,18 +33,22 @@
 #include "ble_mcu.h"
 
 #include "gpio_mcu.h"
+#include "led.h"
 
 /*==================[macros and definitions]=================================*/
 //#define umbral 500
 #define PERIODO_SENSADO_US 15000
-#define UMBRAL_TEMPORAL 100000
-#define TIEMPO_CEBADO 100000
+#define UMBRAL_TEMPORAL 1000
+#define TIEMPO_CEBADO 3000
 uint16_t global_contador = 0;
 uint16_t senial_medida;
 uint16_t umbral = 2400;
+
 //uint16_t estado = "esperando";
 enum{esperando, tiempo,cebar};
 bool apertura = false;
+uint8_t estado = esperando;
+
 /*==================[internal data definition]===============================*/
 TaskHandle_t SensarTask_task_handle = NULL;
 TaskHandle_t ValveControlTask_task_handle = NULL;
@@ -60,10 +64,13 @@ typedef struct
 static void SensarTask(void *pvParameter){
 
     while(true){
+        //LedOn(LED_1);
+        //LedOn(LED_2);
+        //LedOn(LED_3);
 
-    	ulTaskNotifyTake(pdTRUE, portMAX_DELAY); 
-        
-		AnalogInputReadSingle(CH1, &senial_medida);
+    	AnalogInputReadSingle(CH3, &senial_medida);
+
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY); 	
 
         vTaskNotifyGiveFromISR(ProcesarTask_task_handle, pdFALSE); 
 
@@ -71,27 +78,42 @@ static void SensarTask(void *pvParameter){
 }
 
 static void ProcesarTask(void *pvParameter){
-    uint8_t estado = esperando;
+//    uint8_t estado = esperando;
     while(true){
     	ulTaskNotifyTake(pdTRUE, portMAX_DELAY); 
         switch(estado){
             case esperando:
+                LedOff(LED_2);
+                LedOff(LED_3);
+                LedOn(LED_1);
                 if(senial_medida > umbral){
                 estado = tiempo;
+                
+                
+
             }
             break;
 
             case tiempo:
+            LedOn(LED_2);
+            LedOff(LED_1);
+            LedOff(LED_3);
             vTaskDelay(UMBRAL_TEMPORAL/ portTICK_PERIOD_MS);
             if (senial_medida > umbral){
                 estado = cebar;
             }
             else{
-                estado = esperando;
+                if (senial_medida < umbral){
+                    estado = esperando;
+                }
+                
             }
             break;
 
             case cebar:
+            LedOn(LED_3);
+            LedOff(LED_2);
+            LedOff(LED_1);
             apertura = true;
             vTaskDelay(TIEMPO_CEBADO/ portTICK_PERIOD_MS);
             apertura = false;
@@ -107,7 +129,7 @@ static void ValveControlTask(void *pvParameter){
         if(apertura)
         {   global_contador = global_contador+1;
 
-            if(global_contador >= 100){
+            if(global_contador >= 3){
                 GPIOOff(GPIO_1);
                 global_contador = 0;
             }
@@ -124,6 +146,13 @@ static void ValveControlTask(void *pvParameter){
             }
 
         }
+        else{
+            GPIOOff(GPIO_1);
+            global_contador = 0;
+        }
+        //global_contador = 0;
+        vTaskDelay(500/ portTICK_PERIOD_MS);
+
     }
     
 }
@@ -140,13 +169,14 @@ void app_main(void){
     
 	//gpioConf_t pin_relay = {GPIO_1, GPIO_OUPUT};
     GPIOInit(GPIO_1,GPIO_OUTPUT);
-    
+    LedsInit();
+
 	analog_input_config_t analog = {
-		.input = CH1, //le paso el canal
+		.input = CH3, //le paso el canal
 		.mode = ADC_SINGLE,//el modo en el que va a operar
-		.func_p = NULL,
-		.param_p = NULL,
-		.sample_frec = 0
+		//.func_p = NULL,
+		//.param_p = NULL,
+		//.sample_frec = 0
 	};
 
 	AnalogInputInit(&analog);
