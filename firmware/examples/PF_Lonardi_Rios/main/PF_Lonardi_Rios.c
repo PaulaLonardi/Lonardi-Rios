@@ -35,20 +35,22 @@
 #include "gpio_mcu.h"
 #include "led.h"
 
+#include "buzzer.h"
+#include "buzzer_melodies.h"
+
 /*==================[macros and definitions]=================================*/
 //#define umbral 500
 #define PERIODO_SENSADO_US 15000
 #define UMBRAL_TEMPORAL 1000
 #define TIEMPO_CEBADO 3000
-uint16_t global_contador = 0;
 uint16_t senial_medida;
-uint16_t umbral = 2400;
+uint16_t umbral = 2000;
 
 //uint16_t estado = "esperando";
-enum{esperando, tiempo,cebar};
+enum{esperando, tiempo,cebar, alerta};
 bool apertura = false;
 uint8_t estado = esperando;
-
+bool lock = false;  
 /*==================[internal data definition]===============================*/
 TaskHandle_t SensarTask_task_handle = NULL;
 TaskHandle_t ValveControlTask_task_handle = NULL;
@@ -61,24 +63,44 @@ typedef struct
 	} gpioConf_t;
 
 /*==================[internal functions declaration]=========================*/
+
+//cosas de la app bluetooth
+volatile uint8_t config_tiempo_cebado = 0;
+
+void read_data(uint8_t * data, uint8_t length){
+	uint8_t i = 1;
+    
+	char msg[55];
+
+	if(data[0] == 'R'){
+        /* El slidebar Rojo envía los datos con el formato "R" + value + "A" */
+		config_tiempo_cebado = 0;
+		while(data[i] != 'A'){
+            /* Convertir el valor ASCII a un valor entero */
+			config_tiempo_cebado = config_tiempo_cebado * 10;
+			config_tiempo_cebado = config_tiempo_cebado + (data[i] - '0');
+			i++;
+		}
+	}
+    /* Se envía una realimentación de los valores actuales de brillo del LED */
+    sprintf(msg, "Tiempo de cebado: %d\n", config_tiempo_cebado);
+    BleSendString(msg);
+}
+
+
 static void SensarTask(void *pvParameter){
 
     while(true){
-        //LedOn(LED_1);
-        //LedOn(LED_2);
-        //LedOn(LED_3);
-
     	AnalogInputReadSingle(CH3, &senial_medida);
-
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY); 	
-
         vTaskNotifyGiveFromISR(ProcesarTask_task_handle, pdFALSE); 
 
     }
 }
 
 static void ProcesarTask(void *pvParameter){
-//    uint8_t estado = esperando;
+    uint16_t global_contador = 0;
+    
     while(true){
     	ulTaskNotifyTake(pdTRUE, portMAX_DELAY); 
         switch(estado){
@@ -86,76 +108,89 @@ static void ProcesarTask(void *pvParameter){
                 LedOff(LED_2);
                 LedOff(LED_3);
                 LedOn(LED_1);
-                if(senial_medida > umbral){
-                estado = tiempo;
-                
-                
 
-            }
+                if(senial_medida > umbral ){
+                estado = tiempo;
+                }
+
             break;
 
             case tiempo:
-            LedOn(LED_2);
-            LedOff(LED_1);
-            LedOff(LED_3);
-            vTaskDelay(UMBRAL_TEMPORAL/ portTICK_PERIOD_MS);
-            if (senial_medida > umbral){
-                estado = cebar;
-            }
-            else{
-                if (senial_medida < umbral){
-                    estado = esperando;
+                LedOn(LED_2);
+                LedOff(LED_1);
+                LedOff(LED_3);
+                vTaskDelay(UMBRAL_TEMPORAL/ portTICK_PERIOD_MS);
+                if (senial_medida > umbral){
+                    estado = cebar;
                 }
+                else{
                 
-            }
+                        estado = esperando;    
+                }
             break;
 
             case cebar:
-            LedOn(LED_3);
-            LedOff(LED_2);
-            LedOff(LED_1);
-            apertura = true;
-            vTaskDelay(TIEMPO_CEBADO/ portTICK_PERIOD_MS);
-            apertura = false;
-            estado = esperando;
+                LedOn(LED_3);
+                LedOff(LED_2);
+                LedOff(LED_1);
 
-        }
-    }
-}
+                //Verifico que se haya configurado de forma externa el tiempo de cebado
+                if (config_tiempo_cebado > 0 ){
+                    //Alarma de apertura
+                    BuzzerPlayTone(1840, 150);
+                    BuzzerPlayTone(1940, 150);
+                    BuzzerPlayTone(2040, 150);
+                    GPIOOn(GPIO_1);
+                }
+                //BuzzerPlayRtttl(songSimpsons);
+                global_contador++;
 
-static void ValveControlTask(void *pvParameter){
-    while (true)
-    {
-        if(apertura)
-        {   global_contador = global_contador+1;
+                if (global_contador >= 2) {
+                        estado = alerta; 
+                    } else {
+                        if (config_tiempo_cebado > 0 ){
+                        vTaskDelay((config_tiempo_cebado*1000) / portTICK_PERIOD_MS);
+                        //apertura = false;
+                        GPIOOff(GPIO_1);
+                        
+                        //alarma de cierre
+                        BuzzerPlayTone(2040, 150);
+                        BuzzerPlayTone(1940, 150);
+                        BuzzerPlayTone(1840, 150);
 
-            if(global_contador >= 3){
+                        estado = esperando;
+                        }
+                        else {
+                        vTaskDelay(TIEMPO_CEBADO / portTICK_PERIOD_MS);
+                        //apertura = false;
+                        estado = esperando;
+                        }
+                    }
+                break;
+            case alerta:
+                LedOn(LED_1);
+                LedOn(LED_2);
+                LedOn(LED_3);
+                 // Cierra la válvula como medida de seguridad
                 GPIOOff(GPIO_1);
+
+                //alarma de alerta
+                BuzzerPlayTone(1440, 150);
+                BuzzerPlayTone(1340, 150);
+                BuzzerPlayTone(1240, 150);
+            
+               
+
+                vTaskDelay(1000 / portTICK_PERIOD_MS);  
+                if(senial_medida < umbral ){
+                estado = esperando;
                 global_contador = 0;
-            }
-
-            else{
-                if(senial_medida > umbral){
-                GPIOOn(GPIO_1);
                 }
-
-                else{
-                    GPIOOff(GPIO_1);
-                    global_contador = 0;
-                }
-            }
-
+            break;
         }
-        else{
-            GPIOOff(GPIO_1);
-            global_contador = 0;
-        }
-        //global_contador = 0;
-        vTaskDelay(500/ portTICK_PERIOD_MS);
-
     }
-    
 }
+
 
 void FuncTimerA(void* param){
     vTaskNotifyGiveFromISR(SensarTask_task_handle, pdFALSE); 
@@ -166,7 +201,15 @@ void FuncTimerA(void* param){
 
 /*==================[external functions definition]==========================*/
 void app_main(void){
-    
+
+    GPIOInit(GPIO_2,GPIO_OUTPUT);
+    BuzzerInit(GPIO_2);
+
+    ble_config_t ble_configuration = {
+        "MateSeguro",
+        read_data
+    };
+    BleInit(&ble_configuration);
 	//gpioConf_t pin_relay = {GPIO_1, GPIO_OUPUT};
     GPIOInit(GPIO_1,GPIO_OUTPUT);
     LedsInit();
@@ -194,7 +237,7 @@ void app_main(void){
     TimerInit(&timer_sensar);
 
 
-	xTaskCreate(&ValveControlTask, "control de valvula",2048, NULL,5,&ValveControlTask_task_handle);
+	//xTaskCreate(&ValveControlTask, "control de valvula",2048, NULL,5,&ValveControlTask_task_handle);
 	xTaskCreate(&SensarTask, "tarea de sensado",2048, NULL,5,&SensarTask_task_handle);
 	xTaskCreate(&ProcesarTask, "procesamiento de la info",2048, NULL,5,&ProcesarTask_task_handle);
 

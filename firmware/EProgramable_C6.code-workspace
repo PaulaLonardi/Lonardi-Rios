@@ -99,7 +99,10 @@
             "vumeter.h": "c",
             "rtc_mcu.h": "c",
             "fft.h": "c",
-            "i2c.h": "c"
+            "i2c.h": "c",
+            "song.h": "c",
+            "buzzer_melodies.h": "c",
+            "buzzer.h": "c"
         },
     },
     "tasks": {
