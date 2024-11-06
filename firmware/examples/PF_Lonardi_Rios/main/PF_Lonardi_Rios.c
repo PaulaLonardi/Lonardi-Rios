@@ -3,8 +3,9 @@
  * @section genDesc Descripción General
  *
  * Proyecto de Paula Lonardi y Tomás Ríos. 
- * El sistema MateSeguro permite monitorear y controlar condiciones de apertura en un contenedor mediante un LED RGB, 
- * un buzzer, y un sistema de comunicación BLE para configuraciones y alertas.
+ * El sistema MateSeguro permite monitorear y controlar condiciones de apertura en un contenedor mediante
+ * un buzzer, y un sistema de comunicación BLE para configuraciones y realimentación de la misma.
+ * Para ser utilizado, elsistema verifica que las configuraciones si o si esten establecidas, para evitar accidentes.
  *
  * @section changelog Historial de Cambios
  *
