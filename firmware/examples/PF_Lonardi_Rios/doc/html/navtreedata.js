@@ -24,7 +24,7 @@
 */
 var NAVTREE =
 [
-  [ "Proyecto final, Lonardi y Rios", "index.html", [
+  [ "Proyecto final", "index.html", [
     [ "Proyecto final: MateSeguro", "index.html", "index" ],
     [ "Ejemplo Bluetooth LED RGB", "md__c_1_2reositorio_2_lonardi-_rios_2firmware_2examples_2_p_f___lonardi___rios_2_r_e_a_d_m_e.html", [
       [ "Cómo usar el ejemplo", "md__c_1_2reositorio_2_lonardi-_rios_2firmware_2examples_2_p_f___lonardi___rios_2_r_e_a_d_m_e.html#autotoc_md1", [
