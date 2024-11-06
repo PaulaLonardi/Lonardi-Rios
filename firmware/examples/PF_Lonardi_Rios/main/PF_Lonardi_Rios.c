@@ -1,20 +1,20 @@
-/*! @mainpage ejemplo Bluetooth LED-RGB
+/*! @mainpage Proyecto final: MateSeguro
  *
- * @section genDesc General Description
+ * @section genDesc Descripción General
  *
- * Este proyecto ejemplifica el uso del módulo de comunicación Bluetooth Low Energy (BLE) 
- * junto con el manejo de tiras de LEDs RGB. 
- * Permite manejar la tonalidad e intensidad del LED RGB incluído en la placa ESP-EDU, 
- * mediante una aplicación móvil.
+ * Proyecto de Paula Lonardi y Tomás Ríos. 
+ * El sistema MateSeguro permite monitorear y controlar condiciones de apertura en un contenedor mediante un LED RGB, 
+ * un buzzer, y un sistema de comunicación BLE para configuraciones y alertas.
  *
- * @section changelog Changelog
+ * @section changelog Historial de Cambios
  *
- * |   Date	    | Description                                    |
- * |:----------:|:-----------------------------------------------|
- * | 02/04/2024 | Document creation		                         |
+ * |   Fecha      | Descripción                                  |
+ * |:------------:|:--------------------------------------------:|
+ * | 02/04/2024   | Creación de la documentación                 |
  *
- * @author Albano Peñalva (albano.penalva@uner.edu.ar)
- *
+ * @authors
+ * - Paula Lonardi: paula.lonardi@ingenieria.uner.edu.ar
+ * - Tomás Ríos: tomas.rios@ingenieria.uner.edu.ar
  */
 
 /*==================[inclusions]=============================================*/
@@ -39,7 +39,6 @@
 #include "buzzer_melodies.h"
 
 /*==================[macros and definitions]=================================*/
-//#define umbral 500
 #define PERIODO_SENSADO_US 15000
 #define UMBRAL_TEMPORAL 1000
 #define TIEMPO_CEBADO 3000
@@ -64,9 +63,15 @@ typedef struct
 
 /*==================[internal functions declaration]=========================*/
 
-//cosas de la app bluetooth
 volatile uint8_t config_tiempo_cebado = 0;
-
+/*! @brief Función para recibir y procesar datos de la app bluetooth
+ *
+ *  Procesa el tiempo de cebado recibido desde la aplicación móvil y envía un mensaje 
+ *  de retroalimentación con el valor configurado.
+ *
+ *  @param[in] data Puntero a los datos recibidos
+ *  @param[in] length Longitud de los datos recibidos
+ */
 void read_data(uint8_t * data, uint8_t length){
 	uint8_t i = 1;
     
@@ -87,7 +92,12 @@ void read_data(uint8_t * data, uint8_t length){
     BleSendString(msg);
 }
 
-
+/*! @brief Tarea de sensado de señal
+ *
+ *  Lee la señal analógica y notifica a la tarea de procesamiento.
+ *
+ *  @param[in] pvParameter (void)
+ */
 static void SensarTask(void *pvParameter){
 
     while(true){
@@ -97,7 +107,13 @@ static void SensarTask(void *pvParameter){
 
     }
 }
-
+/*! @brief Tarea de procesamiento de la señal medida
+ *
+ *  Procesa la señal y cambia el estado del sistema en función de la condición de apertura.
+ * Tiene una máquina de estado que se encarga de esto
+ *
+ *  @param[in] pvParameter Parámetros de la tarea
+ */
 static void ProcesarTask(void *pvParameter){
     uint16_t global_contador = 0;
     
@@ -142,7 +158,6 @@ static void ProcesarTask(void *pvParameter){
                     BuzzerPlayTone(2040, 150);
                     GPIOOn(GPIO_1);
                 }
-                //BuzzerPlayRtttl(songSimpsons);
                 global_contador++;
 
                 if (global_contador >= 2) {
@@ -191,15 +206,22 @@ static void ProcesarTask(void *pvParameter){
     }
 }
 
-
+/*! @brief Función de timer para activar SensarTask
+ *
+ *  Activa la tarea de sensado cada periodo de tiempo definido.
+ *
+ *  @param[in] param Parámetros de la función
+ */
 void FuncTimerA(void* param){
     vTaskNotifyGiveFromISR(SensarTask_task_handle, pdFALSE); 
 }
-//void FuncTimerB(void* param){
-//    vTaskNotifyGiveFromISR(ValveControlTask_task_handle, pdFALSE); 
-//}
 
 /*==================[external functions definition]==========================*/
+/*! @brief Función principal del programa
+ *
+ *  Inicializa GPIOs, LED, Buzzer, BLE y crea las tareas necesarias para el funcionamiento.
+ *  Inicia el timer a
+ */
 void app_main(void){
 
     GPIOInit(GPIO_2,GPIO_OUTPUT);
