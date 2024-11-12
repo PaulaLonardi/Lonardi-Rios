@@ -3,10 +3,30 @@
  * @section genDesc Descripción General
  *
  * Proyecto de Paula Lonardi y Tomás Ríos. 
- * El sistema MateSeguro permite monitorear y controlar condiciones de apertura en un contenedor mediante
- * un buzzer, y un sistema de comunicación BLE para configuraciones y realimentación de la misma.
- * Para ser utilizado, el sistema verifica que las configuraciones si o si esten establecidas, para evitar accidentes.
+ * El sistema MateSeguro es un dispositivo de monitoreo y control diseñado para que personas que no tienen vision puedan disfrutar 
+ * de la costumbre de tomar mate de una forma segura. La correcta funcionalidad, se basa a través de un sistema de detección de 
+ * apertura y cierre de una vavula. Este sistema incluye un timbre que actúa como alarma sonora y una interfaz de 
+ * comunicación Bluetooth Low Energy (BLE) que permite configurar los parámetros de operación, estos parámeteos fueron pensados, 
+ * para que una persona vidente pueda configurarlos previamente y recibir retroalimentación en 
+ * tiempo real. 
+ * Mediante sensores y una máquina de estado, el sistema verifica si la apertura del contenedor ocurre en condiciones 
+ * seguras. Si las configuraciones establecidas por el usuario no se cumplen o si el contenedor está abierto de manera inapropiada, 
+ * 
+ *| Sensor de señal analógica | ESP32  |
+ *|---------------------------|--------|
+ *| Canal                     | CH3    |
+ *| Tierra                    | Tierra |
  *
+ *| Válvula (Rele)  | ESP32             |
+ *|-----------------|-------------------|
+ *| PIN+            | GPIO_1            |
+ *| Tierra          | Tierra            |
+ * 
+ *| Buzzer         | ESP32             |
+ *|----------------|-------------------|
+ *| PIN+           | GPIO_2            |
+ *| Tierra         | Tierra            |
+ 
  * @section changelog Historial de Cambios
  *
  * |   Fecha      | Descripción                                  |
@@ -195,8 +215,6 @@ static void ProcesarTask(void *pvParameter){
                 BuzzerPlayTone(1340, 150);
                 BuzzerPlayTone(1240, 150);
             
-               
-
                 vTaskDelay(1000 / portTICK_PERIOD_MS);  
                 if(senial_medida < umbral ){
                 estado = esperando;
@@ -226,6 +244,7 @@ void FuncTimerA(void* param){
 void app_main(void){
 
     GPIOInit(GPIO_2,GPIO_OUTPUT);
+    GPIOInit(GPIO_1, GPIO_OUTPUT);
     BuzzerInit(GPIO_2);
 
     ble_config_t ble_configuration = {
